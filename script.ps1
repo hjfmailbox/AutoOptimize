@@ -1,29 +1,32 @@
 # Set the default encoding to UTF8
 [Console]::InputEncoding = [Text.Encoding]::UTF8
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
-
 # Set the warning preference to SilentlyContinue
 $WarningPreference = "SilentlyContinue"
 
+# Global variables with default values
+# Method to execute
+$Global:Method = "InitializeComputer"
 # Change DNS or not
-$IsChangeDNS = $true
-
+$Global:IsChangeDNS = $true
 # Network name
-$NetworkName = "Ethernet0"
+$Global:NetworkName = "Ethernet0"
+# Install path
+$Global:InstallPath = (Join-Path -Path $PSScriptRoot -ChildPath "tools")
+# Activate Windows
+$Global:ActivateWindows = $true
+# Old user name
+$Global:OldUserName = "hjf"
+# New computer name
+$Global:NewComputerName = "hjf-pc"
+# Use local installer
+$Global:UseLocalInstaller = $false
 
-$ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "script.ps1"
-
+# Constants
 $LogsDirectory = Join-Path -Path $PSScriptRoot -ChildPath "logs"
-$InstallPath = Join-Path -Path $PSScriptRoot -ChildPath "tools"
 $InstallersDirectory = Join-Path -Path $PSScriptRoot -ChildPath "installers"
 
-$PowershellCoreInstallerPath = "C:\Users\hjf\AppData\Local\Temp\chocolatey\powershell-core\7.4.1\"
-$WingetInstallerPath = "C:\ProgramData\chocolatey\lib\winget-cli\tools\"
-$DockerInstallerPath = "C:\Users\Administrator\AppData\Local\Temp\chocolatey\docker-desktop\4.28.0\"
-
-#$ActivateWindows = $false
-$ActivateWindows = $true
-
+# Define the array of Windows features to be installed
 $WindowsFeatures = @(
     "IIS-WebServerRole",
     "TelnetClient",
@@ -31,13 +34,6 @@ $WindowsFeatures = @(
     "Microsoft-Windows-Subsystem-Linux",
     "VirtualMachinePlatform"
 )
-
-$TaskName = "ContinueScriptAfterReboot"
-
-$AutoLogonRegistryPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
-
-$OldUserName = "hjf"
-$NewComputerName = "hjf-pc"
 
 # Define the programs to unpin from the taskbar
 $ProgramsToUnpin = @(
@@ -62,9 +58,10 @@ class WingetTool {
 
     [Parameter(Mandatory = $true)]
     [bool] $Install
-}
 
-$UseLocalInstaller = $false
+    [Parameter(Mandatory = $false)]
+    [string] $Parameter
+}
 
 $Installers = [WingetTool[]]@(
     [WingetTool] @{
@@ -105,14 +102,21 @@ $Installers = [WingetTool[]]@(
 )
 
 function InitializeComputer {
+
+    
+    # Ensure the logs directory exists
     Test-Path -Path $LogsDirectory -PathType Container -ErrorAction SilentlyContinue | Out-Null
     if (-not (Test-Path $LogsDirectory)) {
         New-Item -Path $LogsDirectory -ItemType Directory | Out-Null
     }
+
+    # Ensure the installers directory exists
     Test-Path -Path $InstallersDirectory -PathType Container -ErrorAction SilentlyContinue | Out-Null
     if (-not (Test-Path $InstallersDirectory)) {
         New-Item -Path $InstallersDirectory -ItemType Directory | Out-Null
     }
+
+    # Ensure the install path exists
     Test-Path -Path $InstallPath -PathType Container -ErrorAction SilentlyContinue | Out-Null
     if (-not (Test-Path $InstallPath)) {
         New-Item -Path $InstallPath -ItemType Directory | Out-Null
@@ -145,8 +149,8 @@ function InitializeComputer {
     Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name 'EnableLUA' -Value 0 -Type DWord
 
     # Set automatic logon for the Administrator account
-    Set-ItemProperty -Path $AutoLogonRegistryPath -Name 'AutoAdminLogon' -Value 1 -Type DWORD
-    Set-ItemProperty -Path $AutoLogonRegistryPath -Name 'DefaultUsername' -Value "Administrator" -Type String
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name 'AutoAdminLogon' -Value 1 -Type DWORD
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name 'DefaultUsername' -Value "Administrator" -Type String
 
     # Disable the Smart Glass User Policy Handlers to skip the first-use experience
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\SmartGlass" -Name "UserPolicyHandlers" -Value 0
@@ -161,6 +165,7 @@ function InitializeComputer {
     # Disable OneDrive startup
     #Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" -Value ""
     Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run' | Where-Object { $_.Name -like '*OneDrive*' } | Remove-Item
+    #Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" | Remove-ItemProperty -Name "OneDrive"
 
     # Enable the features that require a restart
     Enable-WindowsOptionalFeature -Online -FeatureName $WindowsFeatures -All -NoRestart
@@ -179,11 +184,13 @@ function InitializeComputer {
     Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
 
     # Copy installers to temp
-    if($UseLocalInstaller){
+    if ($UseLocalInstaller) {
+        $PowershellCoreInstallerPath = "C:\Users\hjf\AppData\Local\Temp\chocolatey\powershell-core\7.4.1\"
         if (Test-Path -Path "$PSScriptRoot\installers\PowerShell-7.4.1-win-x64.msi" -ErrorAction SilentlyContinue) {
             New-Item -ItemType Directory -Path $PowershellCoreInstallerPath -Force | Out-Null
             Copy-Item -Path "$PSScriptRoot\installers\PowerShell-7.4.1-win-x64.msi" -Destination $PowershellCoreInstallerPath -Force | Out-Null
         }
+        $WingetInstallerPath = "C:\ProgramData\chocolatey\lib\winget-cli\tools\"
         if (Test-Path -Path "$PSScriptRoot\installers\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -ErrorAction SilentlyContinue) {
             New-Item -ItemType Directory -Path $WingetInstallerPath -Force | Out-Null
             Copy-Item -Path "$PSScriptRoot\installers\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -Destination $WingetInstallerPath -Force | Out-Null
@@ -191,7 +198,7 @@ function InitializeComputer {
     }
 
     # Install powershell-core winget
-    if($UseLocalInstaller){
+    if ($UseLocalInstaller) {
         choco install powershell-core 7.4.1 winget v1.7.10661 -y --force --execution-timeout 0
     }
     else {
@@ -205,11 +212,12 @@ function CreateScheduledTaskAndRestart {
     )
 
     # Create a scheduled task to continue the script after a reboot
+    $ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "script.ps1"
     $TaskDesc = "Continues the script after the computer restarts."
     $TaskTrigger = New-ScheduledTaskTrigger -AtLogOn
     $TaskAction = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-ExecutionPolicy Bypass -NoExit -File `"$ScriptPath`" `"$Method`" -restart"
     $TaskSettings = New-ScheduledTaskSettingsSet
-    Register-ScheduledTask -TaskName $TaskName -Description $TaskDesc -Trigger $TaskTrigger -Settings $TaskSettings -Action $TaskAction -User 'Administrator' -RunLevel 'Highest' -Force  | Out-Null
+    Register-ScheduledTask -TaskName "ContinueScriptAfterReboot" -Description $TaskDesc -Trigger $TaskTrigger -Settings $TaskSettings -Action $TaskAction -User 'Administrator' -RunLevel 'Highest' -Force  | Out-Null
 
     # Add a pause statement for debugging
     Write-Host "Press any key to continue debugging..."
@@ -221,7 +229,7 @@ function CreateScheduledTaskAndRestart {
 
 function DeleteScheduledTask {
     # Unregister the scheduled task after restarting the computer
-    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+    Unregister-ScheduledTask -TaskName "ContinueScriptAfterReboot" -Confirm:$false
 }
 
 function ConfigureWindowsSettings {
@@ -304,14 +312,15 @@ function ConfigureWindowsSettings {
     wsl --install -d Ubuntu-22.04
 
     # Copy installers to temp
-    if($UseLocalInstaller){
+    if ($UseLocalInstaller) {
+        $DockerInstallerPath = "C:\Users\Administrator\AppData\Local\Temp\chocolatey\docker-desktop\4.28.0\"
         if (Test-Path -Path "$PSScriptRoot\installers\Docker Desktop Installer.exe" -ErrorAction SilentlyContinue) {
             New-Item -ItemType Directory -Path $DockerInstallerPath -Force | Out-Null
             Copy-Item -Path "$PSScriptRoot\installers\Docker Desktop Installer.exe" -Destination $DockerInstallerPath -Force | Out-Null
         }
     }
 
-    if($UseLocalInstaller){
+    if ($UseLocalInstaller) {
         # Install docker-desktop
         choco install docker-desktop 4.28.0 -y --force --execution-timeout 0
     }
@@ -323,11 +332,16 @@ function ConfigureWindowsSettings {
 function InstallTools {
     ForEach-Object -InputObject $Installers {
         if ($($_.Install)) {
-            $InstallPath = "$InstallPath\$($_.AppName)"
-            $LogFilePath = "$LogsDirectory\$($_.AppName).log"
-            Write-Host $InstallPath
-            Write-Host $LogFilePath
-            winget install $($_.AppId) --location $InstallPath --log $LogFilePath --silent --accept-source-agreements --accept-package-agreements
+            $wingetCommand = winget install $($_.AppId) `
+               --location $InstallPath\$($Installer.AppName) `
+               --log $LogFilePath `
+               --silent `
+               --accept-source-agreements `
+               --accept-package-agreements
+            if ($Installer.Parameter) {
+                $wingetCommand += " --custom $($Installer.Parameter)"
+            }
+            Invoke-Expression $wingetCommand   
         }
     }
 
@@ -350,14 +364,47 @@ function PinAndUnpinIcons {
     Stop-Process -Name explorer -Force  
 }
 
-
 # Script entry point
 function main {
     param(
-        [string]$Method = "InitializeComputer"
+        [string]$Method,
+        [bool]$IsChangeDNS,
+        [string]$NetworkName,
+        [string]$InstallPath,
+        [bool]$ActivateWindows,
+        [string]$OldUserName,
+        [string]$NewComputerName,
+        [bool]$UseLocalInstaller
     )
 
-    switch ($Method) {
+    # Update global variables if arguments are passed from the command line
+    if ($PSBoundParameters.ContainsKey('Method')) {
+        $Global:Method = $Method
+    }
+    if ($PSBoundParameters.ContainsKey('IsChangeDNS')) {
+        $Global:IsChangeDNS = $IsChangeDNS
+    }
+    if ($PSBoundParameters.ContainsKey('NetworkName')) {
+        $Global:NetworkName = $NetworkName
+    }
+    if ($PSBoundParameters.ContainsKey('InstallPath')) {
+        $Global:InstallPath = $InstallPath
+    }
+    if ($PSBoundParameters.ContainsKey('ActivateWindows')) {
+        $Global:ActivateWindows = $ActivateWindows
+    }
+    if ($PSBoundParameters.ContainsKey('OldUserName')) {
+        $Global:OldUserName = $OldUserName
+    }
+    if ($PSBoundParameters.ContainsKey('NewComputerName')) {
+        $Global:NewComputerName = $NewComputerName
+    }
+    if ($PSBoundParameters.ContainsKey('UseLocalInstaller')) {
+        $Global:UseLocalInstaller = $UseLocalInstaller
+    }
+
+    # Execute the function based on the Method global variable
+    switch ($Global:Method) {
         "InitializeComputer" { 
             InitializeComputer
             CreateScheduledTaskAndRestart -Method "ConfigureWindowsSettings"
@@ -372,7 +419,7 @@ function main {
         "InstallTools" { 
             DeleteScheduledTask
             InstallTools
-            PinAndUnpinIcons
+            #PinAndUnpinIcons
             break
         }
     }
@@ -381,4 +428,4 @@ function main {
     Write-Host "Press any key to continue debugging..."
     $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
-main $args[0]
+main

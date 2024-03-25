@@ -175,7 +175,7 @@ function InitializeComputer {
     # Enable Chocolatey global confirmation
     choco feature enable -n allowGlobalConfirmation
     # Set the number of retry attempts for installing packages
-    choco config set feature.dotnetexe.retryattempts 10
+    choco config set feature.dotnetexe.retryattempts 20
     # Set the wait time between retry attempts for installing packages
     choco config set feature.dotnetexe.retrywait 10000
     # Import RefreshEnv cmd
@@ -213,7 +213,7 @@ function CreateScheduledTaskAndRestart {
     $ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "script.ps1"
     $TaskDesc = "Continues the script after the computer restarts."
     $TaskTrigger = New-ScheduledTaskTrigger -AtLogOn
-    $TaskAction = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-ExecutionPolicy Bypass -NoExit -File `"$ScriptPath`" `"$Method`" -restart"
+    $TaskAction = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-ExecutionPolicy Bypass -NoExit -File `"$ScriptPath`" -Method `"$Method`" -restart"
     $TaskSettings = New-ScheduledTaskSettingsSet
     Register-ScheduledTask -TaskName "ContinueScriptAfterReboot" -Description $TaskDesc -Trigger $TaskTrigger -Settings $TaskSettings -Action $TaskAction -User 'Administrator' -RunLevel 'Highest' -Force  | Out-Null
 
@@ -375,6 +375,8 @@ function main {
         [bool]$UseLocalInstaller
     )
 
+    Write-Host $PSBoundParameters.Count
+
     # Update global variables if arguments are passed from the command line
     if ($PSBoundParameters.ContainsKey('Method')) {
         $Global:Method = $Method
@@ -426,4 +428,4 @@ function main {
     Write-Host "Press any key to continue debugging..."
     $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
-main
+main -Method $Method -IsChangeDNS $IsChangeDNS -NetworkName $NetworkName -InstallPath $InstallPath -ActivateWindows $ActivateWindows -OldUserName $OldUserName -NewComputerName $NewComputerName -UseLocalInstaller $UseLocalInstaller

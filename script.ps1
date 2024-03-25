@@ -20,7 +20,7 @@ $Global:OldUserName = "hjf"
 # New computer name
 $Global:NewComputerName = "hjf-pc"
 # Use local installer
-$Global:UseLocalInstaller = $false
+$Global:UseLocalInstaller = $true
 
 # Constants
 $LogsDirectory = Join-Path -Path $PSScriptRoot -ChildPath "logs"
@@ -102,8 +102,6 @@ $Installers = [WingetTool[]]@(
 )
 
 function InitializeComputer {
-
-    
     # Ensure the logs directory exists
     Test-Path -Path $LogsDirectory -PathType Container -ErrorAction SilentlyContinue | Out-Null
     if (-not (Test-Path $LogsDirectory)) {
@@ -117,13 +115,13 @@ function InitializeComputer {
     }
 
     # Ensure the install path exists
-    Test-Path -Path $InstallPath -PathType Container -ErrorAction SilentlyContinue | Out-Null
-    if (-not (Test-Path $InstallPath)) {
-        New-Item -Path $InstallPath -ItemType Directory | Out-Null
+    Test-Path -Path $Global:InstallPath -PathType Container -ErrorAction SilentlyContinue | Out-Null
+    if (-not (Test-Path $Global:InstallPath)) {
+        New-Item -Path $Global:InstallPath -ItemType Directory | Out-Null
     }
 
-    if ($IsChangeDNS) {
-        Set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter -Name $NetworkName).ifIndex -ServerAddresses 114.114.114.114
+    if ($Global:IsChangeDNS) {
+        Set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter -Name $Global:NetworkName).ifIndex -ServerAddresses 114.114.114.114
     }
 
     # Set the monitor timeout to 0
@@ -133,13 +131,13 @@ function InitializeComputer {
     # Set the standby timeout to 30
     powercfg -change hibernate-timeout-ac 30
 
-    if ($ActivateWindows) {
+    if ($Global:ActivateWindows) {
         # Activate Windows system
         & ([ScriptBlock]::Create((Invoke-RestMethod https://massgrave.dev/get))) /HWID
     }
 
     # Rename the computer name
-    Rename-Computer -NewName $NewComputerName -Force -ErrorAction Stop | Out-Null
+    Rename-Computer -NewName $Global:NewComputerName -Force -ErrorAction Stop | Out-Null
 
     # Enable the Administrator account
     Enable-LocalUser -Name "Administrator" | Out-Null
@@ -184,7 +182,7 @@ function InitializeComputer {
     Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
 
     # Copy installers to temp
-    if ($UseLocalInstaller) {
+    if ($Global:UseLocalInstaller) {
         $PowershellCoreInstallerPath = "C:\Users\hjf\AppData\Local\Temp\chocolatey\powershell-core\7.4.1\"
         if (Test-Path -Path "$PSScriptRoot\installers\PowerShell-7.4.1-win-x64.msi" -ErrorAction SilentlyContinue) {
             New-Item -ItemType Directory -Path $PowershellCoreInstallerPath -Force | Out-Null
@@ -198,7 +196,7 @@ function InitializeComputer {
     }
 
     # Install powershell-core winget
-    if ($UseLocalInstaller) {
+    if ($Global:UseLocalInstaller) {
         choco install powershell-core 7.4.1 winget v1.7.10661 -y --force --execution-timeout 0
     }
     else {
@@ -234,8 +232,8 @@ function DeleteScheduledTask {
 
 function ConfigureWindowsSettings {
     # Delete the standard user account `hjf` and its directory
-    Remove-LocalUser -Name $OldUserName
-    $UserHome = "C:\Users\$OldUserName"
+    Remove-LocalUser -Name $Global:OldUserName
+    $UserHome = "C:\Users\$Global:OldUserName"
     Remove-Item -Path $UserHome -Recurse -Force
 
     # Disable current user UAC prompt
@@ -312,7 +310,7 @@ function ConfigureWindowsSettings {
     wsl --install -d Ubuntu-22.04
 
     # Copy installers to temp
-    if ($UseLocalInstaller) {
+    if ($Global:UseLocalInstaller) {
         $DockerInstallerPath = "C:\Users\Administrator\AppData\Local\Temp\chocolatey\docker-desktop\4.28.0\"
         if (Test-Path -Path "$PSScriptRoot\installers\Docker Desktop Installer.exe" -ErrorAction SilentlyContinue) {
             New-Item -ItemType Directory -Path $DockerInstallerPath -Force | Out-Null
@@ -320,7 +318,7 @@ function ConfigureWindowsSettings {
         }
     }
 
-    if ($UseLocalInstaller) {
+    if ($Global:UseLocalInstaller) {
         # Install docker-desktop
         choco install docker-desktop 4.28.0 -y --force --execution-timeout 0
     }
@@ -333,7 +331,7 @@ function InstallTools {
     ForEach-Object -InputObject $Installers {
         if ($($_.Install)) {
             $wingetCommand = winget install $($_.AppId) `
-               --location $InstallPath\$($Installer.AppName) `
+               --location $Global:InstallPath\$($Installer.AppName) `
                --log $LogFilePath `
                --silent `
                --accept-source-agreements `

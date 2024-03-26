@@ -2,17 +2,6 @@
 [Console]::InputEncoding = [Text.Encoding]::UTF8
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 
-param(
-    [string]$Method,
-    [bool]$IsChangeDNS,
-    [string]$NetworkName,
-    [string]$InstallPath,
-    [bool]$ActivateWindows,
-    [string]$OldUserName,
-    [string]$NewComputerName,
-    [bool]$UseLocalInstaller
-)
-
 # Set the warning preference to SilentlyContinue
 $WarningPreference = "SilentlyContinue"
 
@@ -225,7 +214,7 @@ function CreateScheduledTaskAndRestart {
     $ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "script.ps1"
     $TaskDesc = "Continues the script after the computer restarts."
     $TaskTrigger = New-ScheduledTaskTrigger -AtLogOn
-    $TaskAction = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-ExecutionPolicy Bypass -NoExit -File `"$ScriptPath`" -Method `"$Method`" -restart"
+    $TaskAction = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-ExecutionPolicy Bypass -NoExit -File `"$ScriptPath`" `"$Method`" -restart"
     $TaskSettings = New-ScheduledTaskSettingsSet
     Register-ScheduledTask -TaskName "ContinueScriptAfterReboot" -Description $TaskDesc -Trigger $TaskTrigger -Settings $TaskSettings -Action $TaskAction -User 'Administrator' -RunLevel 'Highest' -Force  | Out-Null
 
@@ -376,6 +365,19 @@ function PinAndUnpinIcons {
 
 # Script entry point
 function main {
+    param(
+        [string]$Method,
+        [bool]$IsChangeDNS,
+        [string]$NetworkName,
+        [string]$InstallPath,
+        [bool]$ActivateWindows,
+        [string]$OldUserName,
+        [string]$NewComputerName,
+        [bool]$UseLocalInstaller
+    )
+
+    Write-Host $PSBoundParameters
+    Write-Host $PSBoundParameters.Count
     Write-Host $PSBoundParameters.ContainsKey('Method')
     Write-Host $PSBoundParameters['Method']
 
@@ -431,4 +433,5 @@ function main {
     $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 #main -Method $Method -IsChangeDNS $IsChangeDNS -NetworkName $NetworkName -InstallPath $InstallPath -ActivateWindows $ActivateWindows -OldUserName $OldUserName -NewComputerName $NewComputerName -UseLocalInstaller $UseLocalInstaller
+#main $args[0]
 main

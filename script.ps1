@@ -432,6 +432,7 @@ function main {
     Write-Host "Press any key to continue debugging..."
     $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
+
 #main -Method $Method -IsChangeDNS $IsChangeDNS -NetworkName $NetworkName -InstallPath $InstallPath -ActivateWindows $ActivateWindows -OldUserName $OldUserName -NewComputerName $NewComputerName -UseLocalInstaller $UseLocalInstaller
 #main $args[0]
 main

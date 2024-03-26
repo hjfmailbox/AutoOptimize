@@ -1,6 +1,18 @@
 # Set the default encoding to UTF8
 [Console]::InputEncoding = [Text.Encoding]::UTF8
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
+
+param(
+    [string]$Method,
+    [bool]$IsChangeDNS,
+    [string]$NetworkName,
+    [string]$InstallPath,
+    [bool]$ActivateWindows,
+    [string]$OldUserName,
+    [string]$NewComputerName,
+    [bool]$UseLocalInstaller
+)
+
 # Set the warning preference to SilentlyContinue
 $WarningPreference = "SilentlyContinue"
 
@@ -20,7 +32,7 @@ $Global:OldUserName = "hjf"
 # New computer name
 $Global:NewComputerName = "hjf-pc"
 # Use local installer
-$Global:UseLocalInstaller = $true
+$Global:UseLocalInstaller = $false
 
 # Constants
 $LogsDirectory = Join-Path -Path $PSScriptRoot -ChildPath "logs"
@@ -364,18 +376,8 @@ function PinAndUnpinIcons {
 
 # Script entry point
 function main {
-    param(
-        [string]$Method,
-        [bool]$IsChangeDNS,
-        [string]$NetworkName,
-        [string]$InstallPath,
-        [bool]$ActivateWindows,
-        [string]$OldUserName,
-        [string]$NewComputerName,
-        [bool]$UseLocalInstaller
-    )
-
-    Write-Host $PSBoundParameters.Count
+    Write-Host $PSBoundParameters.ContainsKey('Method')
+    Write-Host $PSBoundParameters['Method']
 
     # Update global variables if arguments are passed from the command line
     if ($PSBoundParameters.ContainsKey('Method')) {
@@ -428,4 +430,5 @@ function main {
     Write-Host "Press any key to continue debugging..."
     $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
-main -Method $Method -IsChangeDNS $IsChangeDNS -NetworkName $NetworkName -InstallPath $InstallPath -ActivateWindows $ActivateWindows -OldUserName $OldUserName -NewComputerName $NewComputerName -UseLocalInstaller $UseLocalInstaller
+#main -Method $Method -IsChangeDNS $IsChangeDNS -NetworkName $NetworkName -InstallPath $InstallPath -ActivateWindows $ActivateWindows -OldUserName $OldUserName -NewComputerName $NewComputerName -UseLocalInstaller $UseLocalInstaller
+main

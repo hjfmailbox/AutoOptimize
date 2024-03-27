@@ -158,8 +158,11 @@ function InitializeComputer {
     New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OOBE" -Force | Out-Null
     # Set the policy to disable the privacy experience on OOBE (Out-of-Box Experience)
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OOBE" -Name "DisablePrivacyExperience" -Value 1
-    # Set the policy to disable the "Agree to cross-border data transfer" prompt
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OOBE" -Name "DisableOobeDatasourceWindows" -Value 1
+    # Set the policy to disable the "Agree to cross-border data transfer" prompt
+    $AdminSID = (Get-WmiObject -Class Win32_UserAccount -Filter "Name='Administrator'").SID
+    New-Item -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy\TosAdditionalDataPeriodic\$AdminSID" -Force | Out-Null
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy\TosAdditionalDataPeriodic\$AdminSID" -Name "TosAdditionalDataPeriodic" -Value 1 -Type DWord
 
     # Disable OneDrive startup
     #Set-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" -Value ""
@@ -167,9 +170,9 @@ function InitializeComputer {
     #Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" | Remove-ItemProperty -Name "OneDrive"
 
     # Enable the features that require a restart
-    Enable-WindowsOptionalFeature -Online -FeatureName $WindowsFeatures -All -NoRestart
+    Enable-WindowsOptionalFeature -Online -FeatureName $WindowsFeatures -All -NoRestart | Out-Null
     # Disable the Windows Media Player
-    Disable-WindowsOptionalFeature -Online -FeatureName "WindowsMediaPlayer" -NoRestart
+    Disable-WindowsOptionalFeature -Online -FeatureName "WindowsMediaPlayer" -NoRestart | Out-Null
 
     # Install Chocolatey
     Invoke-WebRequest https://community.chocolatey.org/install.ps1 -UseBasicParsing | Invoke-Expression
@@ -214,7 +217,7 @@ function CreateScheduledTaskAndRestart {
     $ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "script.ps1"
     $TaskDesc = "Continues the script after the computer restarts."
     $TaskTrigger = New-ScheduledTaskTrigger -AtLogOn
-    $TaskAction = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-ExecutionPolicy Bypass -NoExit -File `"$ScriptPath`" `"$Method`" -restart"
+    $TaskAction = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-ExecutionPolicy Bypass -NoExit -File `"$ScriptPath`" -Method `"$Method`""
     $TaskSettings = New-ScheduledTaskSettingsSet
     Register-ScheduledTask -TaskName "ContinueScriptAfterReboot" -Description $TaskDesc -Trigger $TaskTrigger -Settings $TaskSettings -Action $TaskAction -User 'Administrator' -RunLevel 'Highest' -Force  | Out-Null
 
@@ -332,11 +335,11 @@ function InstallTools {
     ForEach-Object -InputObject $Installers {
         if ($($_.Install)) {
             $wingetCommand = winget install $($_.AppId) `
-               --location $Global:InstallPath\$($Installer.AppName) `
-               --log $LogFilePath `
-               --silent `
-               --accept-source-agreements `
-               --accept-package-agreements
+                --location $Global:InstallPath\$($Installer.AppName) `
+                --log $LogFilePath `
+                --silent `
+                --accept-source-agreements `
+                --accept-package-agreements
             if ($Installer.Parameter) {
                 $wingetCommand += " --custom $($Installer.Parameter)"
             }
@@ -376,36 +379,46 @@ function main {
         [bool]$UseLocalInstaller
     )
 
-    Write-Host $PSBoundParameters
-    Write-Host $PSBoundParameters.Count
-    Write-Host $PSBoundParameters.ContainsKey('Method')
-    Write-Host $PSBoundParameters['Method']
+    # # Update global variables if arguments are passed from the command line
+    # if ($Method) {
+    #     $Global:Method = $Method
+    # }
+    # if ($IsChangeDNS) {
+    #     $Global:IsChangeDNS = $IsChangeDNS
+    # }
+    # if ($NetworkName) {
+    #     $Global:NetworkName = $NetworkName
+    # }
+    # if ($InstallPath) {
+    #     $Global:InstallPath = $InstallPath
+    # }
+    # if ($ActivateWindows) {
+    #     $Global:ActivateWindows = $ActivateWindows
+    # }
+    # if ($OldUserName) {
+    #     $Global:OldUserName = $OldUserName
+    # }
+    # if ($NewComputerName) {
+    #     $Global:NewComputerName = $NewComputerName
+    # }
+    # if ($UseLocalInstaller) {
+    #     $Global:UseLocalInstaller = $UseLocalInstaller
+    # }
 
-    # Update global variables if arguments are passed from the command line
-    if ($PSBoundParameters.ContainsKey('Method')) {
-        $Global:Method = $Method
+    # Iterate over each parameter defined in the param block
+    foreach ($param in $MyInvocation.MyCommand.Parameters.Keys) {
+        # Retrieve the value of the current parameter
+        $value = Get-Variable -Name $param -ValueOnly
+
+        # If the parameter was passed a value other than $null or an empty string, update the corresponding global variable
+        if ($value -and $value -ne '') {
+            Write-Host "Global:$param value ---> " -NoNewline
+            Write-Host "$value" -ForegroundColor Green
+            Set-Variable -Name $param -Value $value -Scope Global
+        }
     }
-    if ($PSBoundParameters.ContainsKey('IsChangeDNS')) {
-        $Global:IsChangeDNS = $IsChangeDNS
-    }
-    if ($PSBoundParameters.ContainsKey('NetworkName')) {
-        $Global:NetworkName = $NetworkName
-    }
-    if ($PSBoundParameters.ContainsKey('InstallPath')) {
-        $Global:InstallPath = $InstallPath
-    }
-    if ($PSBoundParameters.ContainsKey('ActivateWindows')) {
-        $Global:ActivateWindows = $ActivateWindows
-    }
-    if ($PSBoundParameters.ContainsKey('OldUserName')) {
-        $Global:OldUserName = $OldUserName
-    }
-    if ($PSBoundParameters.ContainsKey('NewComputerName')) {
-        $Global:NewComputerName = $NewComputerName
-    }
-    if ($PSBoundParameters.ContainsKey('UseLocalInstaller')) {
-        $Global:UseLocalInstaller = $UseLocalInstaller
-    }
+
+    Write-Host  $Global:Method
 
     # Execute the function based on the Method global variable
     switch ($Global:Method) {
@@ -432,7 +445,4 @@ function main {
     Write-Host "Press any key to continue debugging..."
     $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
-
-#main -Method $Method -IsChangeDNS $IsChangeDNS -NetworkName $NetworkName -InstallPath $InstallPath -ActivateWindows $ActivateWindows -OldUserName $OldUserName -NewComputerName $NewComputerName -UseLocalInstaller $UseLocalInstaller
-#main $args[0]
-main
+main @args
